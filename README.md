@@ -30,7 +30,7 @@ downloaded, however, it does not install R [dependencies](#dependencies).
 
 ```bash
 
-pip install -U git+https://github.com/CenterForMedicalGeneticsGhent/WisecondorX
+pip install -U git+https://github.com/ilya90906767/WisecondorX
 ```
 
 Alternatively, [Conda](https://conda.io/docs/) additionally installs all necessary [depedencies](#dependencies),
