@@ -1,16 +1,20 @@
+# WisecondorX
+
 import json
 import logging
 import os
 import subprocess
 import sys
 import math
-
+import pandas as pd
 import numpy as np
 
 """
 Scales the bin size of a sample.npz to the one  
 requested for the reference
 """
+
+
 def scale_sample(sample, from_size, to_size):
     if not to_size or from_size == to_size:
         return sample
@@ -34,15 +38,19 @@ def scale_sample(sample, from_size, to_size):
             return_sample[chr_name] = scaled_chr
     return return_sample
 
+
 """
 Levels gonosomal reads with the one at the autosomes.
 """
+
+
 def gender_correct(sample, gender):
     if gender == "M":
         sample["23"] = sample["23"] * 2
         sample["24"] = sample["24"] * 2
 
     return sample
+
 
 """
 Communicates with R. Outputs new json dictionary,
@@ -51,6 +59,8 @@ input json. 'infile' and 'R_script' are mandatory keys
 and correspond to the input file required to execute the
 R_script, respectively.
 """
+
+
 def exec_R(json_dict):
     json.dump(json_dict, open(json_dict["infile"], "w"))
 
@@ -68,22 +78,12 @@ def exec_R(json_dict):
         os.remove(json_dict["outfile"])
         return json_out
 
-"""
-Cleans and validates data, converting non-numeric values from input to NaN. (bugfix)
-"""
-def clean_and_validate_data(data):
-    cleaned_data = []
-    for item in data:
-        try:
-            cleaned_item = float(item)
-        except ValueError:
-            cleaned_item = np.nan  # Assign NaN to non-numeric values
-        cleaned_data.append(cleaned_item)
-    return np.array(cleaned_data)
 
 """
 Calculates between sample z-score.
 """
+
+
 def get_z_score(results_c, results):
     results_nr, results_r, results_w = (
         results["results_nr"],
@@ -91,17 +91,39 @@ def get_z_score(results_c, results):
         results["results_w"],
     )
     zs = []
+    x_check=[]
     for segment in results_c:
         segment_nr = results_nr[segment[0]][segment[1] : segment[2]]
         segment_rr = results_r[segment[0]][segment[1] : segment[2]]
         segment_nr = [
-            clean_and_validate_data(segment_nr[i])
-            for i in range(len(segment_nr)) if segment_rr[i] != 0
-        ] #bugfix 
+            segment_nr[i] for i in range(len(segment_nr)) if segment_rr[i] != 0
+        ]
+        for i in range(len(segment_nr)):
+            for ii in range(len(segment_nr[i])):
+                if not np.isfinite(segment_nr[i][ii]):
+                    segment_nr[i][ii] = np.nan
+        segment_w = results_w[segment[0]][segment[1] : segment[2]]
+        segment_w = [segment_w[i] for i in range(len(segment_w)) if segment_rr[i] != 0]
+
+        for x in np.transpose(segment_nr):
+            x_check.append(x)
+
+    with open('results_c2.txt','w') as f:
+            f.write(str(x_check))
+    for segment in results_c:
+        segment_nr = results_nr[segment[0]][segment[1] : segment[2]]
+        segment_rr = results_r[segment[0]][segment[1] : segment[2]]
+        segment_nr = [
+            segment_nr[i] for i in range(len(segment_nr)) if segment_rr[i] != 0
+        ]
+        for i in range(len(segment_nr)):
+            for ii in range(len(segment_nr[i])):
+                if not np.isfinite(segment_nr[i][ii]):
+                    segment_nr[i][ii] = np.nan
         segment_w = results_w[segment[0]][segment[1] : segment[2]]
         segment_w = [segment_w[i] for i in range(len(segment_w)) if segment_rr[i] != 0]
         null_segments = [
-            np.ma.average(np.ma.masked_array(x, np.isnan(x)), weights=segment_w)
+            np.ma.average(np.ma.masked_array(x, pd.isna(x)), weights=segment_w)
             for x in np.transpose(segment_nr)
         ]
         null_mean = np.ma.mean([x for x in null_segments if np.isfinite(x)])
@@ -114,27 +136,31 @@ def get_z_score(results_c, results):
         zs.append(z)
     return zs
 
+
 """
 Returns MSV, measure for sample-wise noise.
 """
+
+
 def get_median_segment_variance(results_c, results_r):
     vars = []
     for segment in results_c:
         segment_r = results_r[segment[0]][int(segment[1]) : int(segment[2])]
-        segment_r = clean_and_validate_data(segment_r) #bugfix
         segment_r = [x for x in segment_r if x != 0]
         if segment_r:
             var = np.var(segment_r)
             vars.append(var)
     return np.median(vars)
 
+
 """
 Returns CPA, measure for sample-wise abnormality.
 """
+
+
 def get_cpa(results_c, binsize):
     x = 0
     for segment in results_c:
         x += (segment[2] - segment[1] + 1) * binsize * abs(segment[3])
     CPA = x / len(results_c) * (10**-8)
     return CPA
-
