@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import math
-import pandas as pd
+
 import numpy as np
 
 """
@@ -91,25 +91,6 @@ def get_z_score(results_c, results):
         results["results_w"],
     )
     zs = []
-    x_check=[]
-    for segment in results_c:
-        segment_nr = results_nr[segment[0]][segment[1] : segment[2]]
-        segment_rr = results_r[segment[0]][segment[1] : segment[2]]
-        segment_nr = [
-            segment_nr[i] for i in range(len(segment_nr)) if segment_rr[i] != 0
-        ]
-        for i in range(len(segment_nr)):
-            for ii in range(len(segment_nr[i])):
-                if not np.isfinite(segment_nr[i][ii]):
-                    segment_nr[i][ii] = np.nan
-        segment_w = results_w[segment[0]][segment[1] : segment[2]]
-        segment_w = [segment_w[i] for i in range(len(segment_w)) if segment_rr[i] != 0]
-
-        for x in np.transpose(segment_nr):
-            x_check.append(x)
-
-    with open('results_c2.txt','w') as f:
-            f.write(str(x_check))
     for segment in results_c:
         segment_nr = results_nr[segment[0]][segment[1] : segment[2]]
         segment_rr = results_r[segment[0]][segment[1] : segment[2]]
@@ -123,7 +104,7 @@ def get_z_score(results_c, results):
         segment_w = results_w[segment[0]][segment[1] : segment[2]]
         segment_w = [segment_w[i] for i in range(len(segment_w)) if segment_rr[i] != 0]
         null_segments = [
-            np.ma.average(np.ma.masked_array(x, pd.isna(x)), weights=segment_w)
+            np.ma.average(np.ma.masked_array(x, np.isnan(x.astype(float))), weights=segment_w)
             for x in np.transpose(segment_nr)
         ]
         null_mean = np.ma.mean([x for x in null_segments if np.isfinite(x)])
